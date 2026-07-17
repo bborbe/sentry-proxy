@@ -6,7 +6,7 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-- Update Go dependencies to latest
+- chore: Update Go dependencies to latest
 
 ## v0.1.0
 
