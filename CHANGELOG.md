@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.2.0
 
 - feat: Report running release version as a label on build_info metric, replacing private copy with shared github.com/bborbe/metrics library
 
