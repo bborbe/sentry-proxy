@@ -6,6 +6,7 @@ require (
 	github.com/bborbe/errors v1.5.16
 	github.com/bborbe/http v1.26.17
 	github.com/bborbe/log v1.6.18
+	github.com/bborbe/metrics v0.5.9
 	github.com/bborbe/run v1.9.31
 	github.com/bborbe/sentry v1.9.23
 	github.com/bborbe/service v1.10.5
