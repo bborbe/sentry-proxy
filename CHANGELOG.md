@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.3.0
 
 - feat: opt into `autoMerge.trivial` for mechanically-trivial update PRs
 
