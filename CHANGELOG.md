@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.3.3
 
 - docs: track `CLAUDE.md` in git instead of gitignoring it, and correct its contents. It described a Kafka Topic Reader service — wrong project, five `pkg/` files that do not exist, and IBM Sarama listed as a key dependency when there is no Kafka client in `go.mod`. Being gitignored, it was also absent from every feature worktree, so dark-factory containers ran here with no project instructions at all.
 
