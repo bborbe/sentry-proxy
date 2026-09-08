@@ -1,6 +1,7 @@
 ---
-status: draft
-created: 2026-09-08
+status: approved
+approved: "2026-09-08T21:16:17Z"
+branch: dark-factory/tee-sentry-alerts-to-kafka
 ---
 
 ## Summary
