@@ -6,8 +6,6 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-## v0.3.5
-
 - feat: tee every received Sentry alert to a Kafka topic as a durable record (`docs/kafka-alert-record.md`) before the rate-limit or forwarding decision, keyed by project; new required config `KAFKA_BROKERS` / `KAFKA_TOPIC`
 
 ## v0.3.4
