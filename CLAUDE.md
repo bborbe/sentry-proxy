@@ -114,10 +114,11 @@ its only in-memory state is the request counter.
 
 ### Rate limiting
 
-The allowance is recomputed per request from process uptime, not from a sliding window,
-and the counter is cumulative since start — it does not reset. Rejections are logged at
-`glog.V(2)` only and increment `SentryAlertRejected`, so a proxy dropping everything
-looks identical to a quiet one unless that metric is watched.
+The budget is a timestamp-pruned sliding window: at most `REQUEST_LIMIT` requests are
+forwarded in any `REQUEST_DURATION` span, with no banking — a quiet period does not build
+up allowance that can be spent later. Rejections never extend the window, are logged at
+warn level and increment `SentryAlertRejected`, so a proxy dropping everything is
+observable without debug verbosity.
 
 Read `pkg/ratelimit-roundtripper.go` before changing anything here; the arithmetic is
 subtler than the env-var names suggest.

@@ -58,8 +58,28 @@ var _ = Describe("RateLimitRoundTripper", func() {
 			fake := &mocks.Producer{}
 			currentTime := libtime.NewCurrentTime()
 			currentTime.SetNow(base)
-			roundTripper := newRateLimitRoundTripper(currentTime, fake, http.DefaultTransport)
+			server, innerRT := newUpstream(nil)
+			defer server.Close()
+			// Sliding-window semantics forward the first request at startup, so
+			// the single-slot window must be filled before the reject path is
+			// exercised (the old cumulative-uptime "first request rejected"
+			// premise no longer holds after the sliding-window fix).
+			roundTripper := pkg.NewRateLimitRoundTripper(
+				currentTime,
+				1,
+				time.Hour,
+				&mocks.Metrics{},
+				fake,
+				innerRT,
+			)
 
+			// fill the window (forwarded)
+			resp0, err := roundTripper.RoundTrip(newTestRequest("/api/project-a/envelope/"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp0.StatusCode).To(Equal(http.StatusOK))
+			resp0.Body.Close()
+
+			// rejected: frozen 429 body, record published with outcome "rejected"
 			resp, err := roundTripper.RoundTrip(newTestRequest("/api/project-a/envelope/"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusTooManyRequests))
@@ -68,8 +88,8 @@ var _ = Describe("RateLimitRoundTripper", func() {
 			resp.Body.Close()
 			Expect(respBody).To(Equal([]byte("reached request limit => 429")))
 
-			Expect(fake.PublishCallCount()).To(Equal(1))
-			body, project, _, outcome := fake.PublishArgsForCall(0)
+			Expect(fake.PublishCallCount()).To(Equal(2))
+			body, project, _, outcome := fake.PublishArgsForCall(1)
 			Expect(body).To(Equal([]byte("envelope-bytes")))
 			Expect(project).To(Equal("project-a"))
 			Expect(outcome).To(Equal("rejected"))
@@ -347,3 +367,136 @@ type errReader struct{}
 func (errReader) Read([]byte) (int, error) {
 	return 0, errors.New(context.Background(), "read boom")
 }
+
+var _ = Describe("RateLimitRoundTripper sliding window", func() {
+	var (
+		baseTime     time.Time
+		currentTime  libtime.CurrentTime
+		fakeMetrics  *mocks.Metrics
+		upstream     http.RoundTripper
+		roundTripper http.RoundTripper
+	)
+
+	BeforeEach(func() {
+		baseTime = time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+		currentTime = libtime.NewCurrentTime()
+		currentTime.SetNow(baseTime)
+		fakeMetrics = &mocks.Metrics{}
+		upstream = libhttp.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewBufferString("ok")),
+			}, nil
+		})
+	})
+
+	newEnvelopeRequest := func() *http.Request {
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"https://example.com/api/123/envelope/",
+			bytes.NewBufferString("sentry envelope body"),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		return req
+	}
+
+	doRequest := func() *http.Response {
+		resp, err := roundTripper.RoundTrip(newEnvelopeRequest())
+		Expect(err).NotTo(HaveOccurred())
+		return resp
+	}
+
+	newSlidingWindowRoundTripper := func(limit int) http.RoundTripper {
+		return pkg.NewRateLimitRoundTripper(
+			currentTime,
+			limit,
+			1*time.Hour,
+			fakeMetrics,
+			&mocks.Producer{},
+			upstream,
+		)
+	}
+
+	Describe("first-minute allowance", func() {
+		BeforeEach(func() {
+			roundTripper = newSlidingWindowRoundTripper(5)
+		})
+
+		It("forwards the first request at startup instead of rejecting it", func() {
+			resp := doRequest()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(1))
+			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(0))
+			Expect(fakeMetrics.SentryAlertTotalIncCallCount()).To(Equal(1))
+		})
+	})
+
+	Describe("sliding-window expiry", func() {
+		BeforeEach(func() {
+			roundTripper = newSlidingWindowRoundTripper(2)
+		})
+
+		It("prunes entries exactly one window old and forwards again", func() {
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+
+			rejected := doRequest()
+			Expect(rejected.StatusCode).To(Equal(http.StatusTooManyRequests))
+			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+
+			currentTime.SetNow(baseTime.Add(1 * time.Hour))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+			Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(3))
+			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+		})
+	})
+
+	Describe("burst-then-quiet recovery", func() {
+		BeforeEach(func() {
+			roundTripper = newSlidingWindowRoundTripper(5)
+		})
+
+		It("recovers after a full burst window expires", func() {
+			for range 5 {
+				Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+			}
+			Expect(doRequest().StatusCode).To(Equal(http.StatusTooManyRequests))
+
+			currentTime.SetNow(baseTime.Add(1 * time.Hour))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+
+			Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(6))
+			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+		})
+	})
+
+	Describe("boundary-straddling burst", func() {
+		BeforeEach(func() {
+			roundTripper = newSlidingWindowRoundTripper(2)
+		})
+
+		It("never forwards more than requestLimit in any window span", func() {
+			// 12:00 — window empty, both forwarded
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+
+			// 12:59 — 12:00 entries still in the window, both rejected
+			currentTime.SetNow(baseTime.Add(59 * time.Minute))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusTooManyRequests))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusTooManyRequests))
+
+			// 13:00 — 12:00 entries are exactly one window old and pruned, both forwarded
+			currentTime.SetNow(baseTime.Add(1 * time.Hour))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusOK))
+
+			// 13:30 — 13:00 entries still in the window, both rejected
+			currentTime.SetNow(baseTime.Add(90 * time.Minute))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusTooManyRequests))
+			Expect(doRequest().StatusCode).To(Equal(http.StatusTooManyRequests))
+
+			Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(4))
+			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(4))
+		})
+	})
+})

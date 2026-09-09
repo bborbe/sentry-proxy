@@ -8,6 +8,10 @@ Please choose versions by [Semantic Versioning](http://semver.org/).
 
 - feat: tee every received Sentry alert to a Kafka topic as a durable record (`docs/kafka-alert-record.md`) before the rate-limit or forwarding decision, keyed by project; new required config `KAFKA_BROKERS` / `KAFKA_TOPIC`
 
+## v0.3.4
+
+- fix: Enforce the request budget as a sliding window — at most `REQUEST_LIMIT` requests are forwarded in any `REQUEST_DURATION` span, timestamp-pruned per request from the injected clock instead of the cumulative uptime-based counter that truncated partial windows to zero; rejections are now logged at warn level instead of `glog.V(2)` only.
+
 ## v0.3.3
 
 - docs: track `CLAUDE.md` in git instead of gitignoring it, and correct its contents. It described a Kafka Topic Reader service — wrong project, five `pkg/` files that do not exist, and IBM Sarama listed as a key dependency when there is no Kafka client in `go.mod`. Being gitignored, it was also absent from every feature worktree, so dark-factory containers ran here with no project instructions at all.

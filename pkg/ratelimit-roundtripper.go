@@ -17,7 +17,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// NewRateLimitRoundTripper prevent request if more than requestLimit
+// NewRateLimitRoundTripper prevents forwarding more than requestLimit requests
+// within any sliding requestDuration window, answering 429 once the window is full.
 func NewRateLimitRoundTripper(
 	currentTimeGetter libtime.CurrentTimeGetter,
 	requestLimit int,
@@ -27,8 +28,7 @@ func NewRateLimitRoundTripper(
 	roundTripper http.RoundTripper,
 ) http.RoundTripper {
 	var mux sync.Mutex
-	var requestCounter uint64
-	started := currentTimeGetter.Now()
+	var timestamps []time.Time
 	return libhttp.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		ctx := req.Context()
 		metrics.SentryAlertTotalInc()
@@ -43,26 +43,31 @@ func NewRateLimitRoundTripper(
 		project := extractProject(req.URL.Path)
 		outcome := "forwarded"
 
-		uptime := now.Sub(started)
-		limit := uint64(float64(requestLimit) * float64(uptime/requestDuration))
-		glog.V(4).
-			Infof("requestLimit(%d) * uptime(%v)/requestDuration(%v) = %d", requestLimit, uptime, requestDuration, limit)
-
 		var response *http.Response
-		if requestCounter >= limit {
+		mux.Lock()
+		// prune leading window entries that are at least one full window old; an
+		// entry exactly requestDuration old drops out, so a request arriving at
+		// the boundary is allowed through.
+		pruned := 0
+		for pruned < len(timestamps) && now.Sub(timestamps[pruned]) >= requestDuration {
+			pruned++
+		}
+		timestamps = timestamps[pruned:]
+		if len(timestamps) >= requestLimit {
 			outcome = "rejected"
-			glog.V(2).Infof("requestCounter(%d) >= limit(%d) => 429", requestCounter, limit)
+			glog.Warningf("requestCounter(%d) >= limit(%d) => 429", len(timestamps), requestLimit)
 			metrics.SentryAlertRejectedInc()
 			defer req.Body.Close()
-			glog.V(2).Infof("sentry alert rejected: %s", string(body))
+			glog.Warningf("sentry alert rejected: %s", string(body))
 			response = &http.Response{
 				Body:       io.NopCloser(bytes.NewBufferString("reached request limit => 429")),
 				StatusCode: http.StatusTooManyRequests,
 			}
+			mux.Unlock()
 		} else {
-			mux.Lock()
+			timestamps = append(timestamps, now)
 			metrics.SentryAlertForwardInc()
-			requestCounter = requestCounter + 1
+			glog.V(4).Infof("increase requestCounter to %d", len(timestamps))
 			mux.Unlock()
 			response, err = roundTripper.RoundTrip(req)
 			if err != nil {
