@@ -1,5 +1,6 @@
 pr: false
 workflow: direct
+hideGit: true
 validationPrompt: docs/dod.md
 autoRelease: false
 env:

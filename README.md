@@ -27,6 +27,8 @@ make buca   # builds + pushes docker.io/bborbe/sentry-proxy:<git-tag>
 | `LISTEN` | `-listen` | yes | Address to listen on (e.g. `:9090`) |
 | `REQUEST_LIMIT` | `-request-limit` | yes | Max forwarded requests per window |
 | `REQUEST_DURATION` | `-request-duration` | yes | Sliding-window duration |
+| `KAFKA_BROKERS` | `-kafka-brokers` | yes | Kafka bootstrap brokers (comma-separated; `plain://` assumed) |
+| `KAFKA_TOPIC` | `-kafka-topic` | yes | Kafka topic to publish received alert records to |
 
 ## HTTP endpoints
 

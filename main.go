@@ -13,6 +13,7 @@ import (
 
 	"github.com/bborbe/errors"
 	libhttp "github.com/bborbe/http"
+	libkafka "github.com/bborbe/kafka"
 	libmetrics "github.com/bborbe/metrics"
 	"github.com/bborbe/run"
 	libsentry "github.com/bborbe/sentry"
@@ -38,9 +39,18 @@ type application struct {
 	Listen          string            `required:"true"  arg:"listen"            env:"LISTEN"            usage:"address to listen to"`
 	RequestLimit    int               `required:"true"  arg:"request-limit"     env:"REQUEST_LIMIT"     usage:"request limit"`
 	RequestDuration time.Duration     `required:"true"  arg:"request-duration"  env:"REQUEST_DURATION"  usage:"request limit duration"`
+	KafkaBrokers    libkafka.Brokers  `required:"true"  arg:"kafka-brokers"     env:"KAFKA_BROKERS"     usage:"Kafka brokers"`
+	KafkaTopic      string            `required:"true"  arg:"kafka-topic"       env:"KAFKA_TOPIC"       usage:"Kafka topic"`
 	BuildGitVersion string            `required:"false" arg:"build-git-version" env:"BUILD_GIT_VERSION" usage:"Build Git version (git describe --tags --always --dirty)"                  default:"dev"`
 	BuildGitCommit  string            `required:"false" arg:"build-git-commit"  env:"BUILD_GIT_COMMIT"  usage:"Build Git commit hash"                                                     default:"none"`
 	BuildDate       *libtime.DateTime `required:"false" arg:"build-date"        env:"BUILD_DATE"        usage:"Build timestamp (RFC3339)"`
+}
+
+func (a *application) Validate(ctx context.Context) error {
+	if err := libkafka.Topic(a.KafkaTopic).Validate(ctx); err != nil {
+		return errors.Wrap(ctx, err, "validate kafka topic failed")
+	}
+	return nil
 }
 
 func (a *application) Run(ctx context.Context, sentryClient libsentry.Client) error {
@@ -49,8 +59,11 @@ func (a *application) Run(ctx context.Context, sentryClient libsentry.Client) er
 	currentTime := libtime.NewCurrentTime()
 	metrics := factory.CreateMetrics(prometheus.DefaultRegisterer)
 
+	producer := factory.CreateProducer(a.KafkaBrokers, libkafka.Topic(a.KafkaTopic), metrics)
+
 	return service.Run(
 		ctx,
+		producer.Run,
 		a.createHTTPServer(sentryClient, metrics, currentTime),
 	)
 }

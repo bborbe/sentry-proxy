@@ -5,11 +5,15 @@
 package factory
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/bborbe/errors"
 	libhttp "github.com/bborbe/http"
+	libkafka "github.com/bborbe/kafka"
+	"github.com/bborbe/log"
 	libsentry "github.com/bborbe/sentry"
 	libtime "github.com/bborbe/time"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +23,25 @@ import (
 
 func CreateMetrics(registerer prometheus.Registerer) pkg.Metrics {
 	return pkg.NewMetrics(registerer)
+}
+
+func CreateProducer(
+	brokers libkafka.Brokers,
+	topic libkafka.Topic,
+	metrics pkg.Metrics,
+) pkg.Producer {
+	return pkg.NewProducer(
+		func(ctx context.Context) (libkafka.JSONSender, error) {
+			syncProducer, err := libkafka.NewSyncProducer(ctx, brokers)
+			if err != nil {
+				return nil, errors.Wrapf(ctx, err, "create kafka sync producer failed")
+			}
+			return libkafka.NewJSONSender(syncProducer, log.DefaultSamplerFactory), nil
+		},
+		topic,
+		metrics,
+		0,
+	)
 }
 
 func CreateRoundTripper(

@@ -8,6 +8,18 @@ import (
 )
 
 type Metrics struct {
+	KafkaPublishDroppedIncStub        func()
+	kafkaPublishDroppedIncMutex       sync.RWMutex
+	kafkaPublishDroppedIncArgsForCall []struct {
+	}
+	KafkaPublishFailureIncStub        func()
+	kafkaPublishFailureIncMutex       sync.RWMutex
+	kafkaPublishFailureIncArgsForCall []struct {
+	}
+	KafkaPublishSuccessIncStub        func()
+	kafkaPublishSuccessIncMutex       sync.RWMutex
+	kafkaPublishSuccessIncArgsForCall []struct {
+	}
 	SentryAlertForwardIncStub        func()
 	sentryAlertForwardIncMutex       sync.RWMutex
 	sentryAlertForwardIncArgsForCall []struct {
@@ -22,6 +34,78 @@ type Metrics struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *Metrics) KafkaPublishDroppedInc() {
+	fake.kafkaPublishDroppedIncMutex.Lock()
+	fake.kafkaPublishDroppedIncArgsForCall = append(fake.kafkaPublishDroppedIncArgsForCall, struct {
+	}{})
+	stub := fake.KafkaPublishDroppedIncStub
+	fake.recordInvocation("KafkaPublishDroppedInc", []interface{}{})
+	fake.kafkaPublishDroppedIncMutex.Unlock()
+	if stub != nil {
+		fake.KafkaPublishDroppedIncStub()
+	}
+}
+
+func (fake *Metrics) KafkaPublishDroppedIncCallCount() int {
+	fake.kafkaPublishDroppedIncMutex.RLock()
+	defer fake.kafkaPublishDroppedIncMutex.RUnlock()
+	return len(fake.kafkaPublishDroppedIncArgsForCall)
+}
+
+func (fake *Metrics) KafkaPublishDroppedIncCalls(stub func()) {
+	fake.kafkaPublishDroppedIncMutex.Lock()
+	defer fake.kafkaPublishDroppedIncMutex.Unlock()
+	fake.KafkaPublishDroppedIncStub = stub
+}
+
+func (fake *Metrics) KafkaPublishFailureInc() {
+	fake.kafkaPublishFailureIncMutex.Lock()
+	fake.kafkaPublishFailureIncArgsForCall = append(fake.kafkaPublishFailureIncArgsForCall, struct {
+	}{})
+	stub := fake.KafkaPublishFailureIncStub
+	fake.recordInvocation("KafkaPublishFailureInc", []interface{}{})
+	fake.kafkaPublishFailureIncMutex.Unlock()
+	if stub != nil {
+		fake.KafkaPublishFailureIncStub()
+	}
+}
+
+func (fake *Metrics) KafkaPublishFailureIncCallCount() int {
+	fake.kafkaPublishFailureIncMutex.RLock()
+	defer fake.kafkaPublishFailureIncMutex.RUnlock()
+	return len(fake.kafkaPublishFailureIncArgsForCall)
+}
+
+func (fake *Metrics) KafkaPublishFailureIncCalls(stub func()) {
+	fake.kafkaPublishFailureIncMutex.Lock()
+	defer fake.kafkaPublishFailureIncMutex.Unlock()
+	fake.KafkaPublishFailureIncStub = stub
+}
+
+func (fake *Metrics) KafkaPublishSuccessInc() {
+	fake.kafkaPublishSuccessIncMutex.Lock()
+	fake.kafkaPublishSuccessIncArgsForCall = append(fake.kafkaPublishSuccessIncArgsForCall, struct {
+	}{})
+	stub := fake.KafkaPublishSuccessIncStub
+	fake.recordInvocation("KafkaPublishSuccessInc", []interface{}{})
+	fake.kafkaPublishSuccessIncMutex.Unlock()
+	if stub != nil {
+		fake.KafkaPublishSuccessIncStub()
+	}
+}
+
+func (fake *Metrics) KafkaPublishSuccessIncCallCount() int {
+	fake.kafkaPublishSuccessIncMutex.RLock()
+	defer fake.kafkaPublishSuccessIncMutex.RUnlock()
+	return len(fake.kafkaPublishSuccessIncArgsForCall)
+}
+
+func (fake *Metrics) KafkaPublishSuccessIncCalls(stub func()) {
+	fake.kafkaPublishSuccessIncMutex.Lock()
+	defer fake.kafkaPublishSuccessIncMutex.Unlock()
+	fake.KafkaPublishSuccessIncStub = stub
 }
 
 func (fake *Metrics) SentryAlertForwardInc() {

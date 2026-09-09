@@ -97,8 +97,8 @@ every proxy instance enforces its own budget independently. See `## Rate limitin
     and proxy handler.
   - `factory/factory_loglevel-handler.go` — runtime log-level handler.
 
-There is **no Kafka client and no datastore** in this service. It is a stateless HTTP
-proxy; its only state is an in-memory request counter that resets when the pod restarts.
+The service publishes every received alert to Kafka via `github.com/bborbe/kafka`;
+its only in-memory state is the request counter.
 
 ### Configuration
 
@@ -109,6 +109,8 @@ proxy; its only state is an in-memory request counter that resets when the pod r
 | `LISTEN` | yes | Listen address, e.g. `:9090` |
 | `REQUEST_LIMIT` | yes | Requests allowed per `REQUEST_DURATION` |
 | `REQUEST_DURATION` | yes | Budget window, e.g. `1h` |
+| `KAFKA_BROKERS` | yes | Kafka bootstrap brokers (comma-separated; `plain://` assumed) |
+| `KAFKA_TOPIC` | yes | Kafka topic to publish received alert records to |
 
 ### Rate limiting
 
