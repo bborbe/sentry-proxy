@@ -64,7 +64,7 @@ func (a *application) Run(ctx context.Context, sentryClient libsentry.Client) er
 	return service.Run(
 		ctx,
 		producer.Run,
-		a.createHTTPServer(sentryClient, metrics, currentTime),
+		a.createHTTPServer(sentryClient, metrics, currentTime, producer),
 	)
 }
 
@@ -72,6 +72,7 @@ func (a *application) createHTTPServer(
 	sentryClient libsentry.Client,
 	metrics pkg.Metrics,
 	currentTime libtime.CurrentTimeGetter,
+	producer pkg.Producer,
 ) run.Func {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithCancel(ctx)
@@ -96,6 +97,7 @@ func (a *application) createHTTPServer(
 				a.RequestLimit,
 				a.RequestDuration,
 				parsedURL,
+				producer,
 			),
 		)
 

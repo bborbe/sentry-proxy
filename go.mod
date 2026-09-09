@@ -3,6 +3,7 @@ module github.com/bborbe/sentry-proxy
 go 1.27.1
 
 require (
+	github.com/IBM/sarama v1.60.2
 	github.com/bborbe/errors v1.6.0
 	github.com/bborbe/http v1.26.26
 	github.com/bborbe/kafka v1.25.15
@@ -21,7 +22,6 @@ require (
 )
 
 require (
-	github.com/IBM/sarama v1.60.2 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/bborbe/argument/v2 v2.13.2 // indirect
 	github.com/bborbe/collection v1.20.26 // indirect

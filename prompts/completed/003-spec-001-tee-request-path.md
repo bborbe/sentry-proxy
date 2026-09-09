@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [001-tee-sentry-alerts-to-kafka]
+summary: 'Teed the request path: single non-blocking Kafka publish call site after the outcome is known, body buffered once and restored, producer threaded through factory and main, with Ginkgo specs locking AC1-AC5, AC11 latency, body-read failure, and project extraction'
+execution_id: sentry-proxy-kafka-tee-exec-003-spec-001-tee-request-path
+dark-factory-version: dev
 created: "2026-09-09T15:06:15Z"
 queued: "2026-09-09T16:55:31Z"
+started: "2026-09-09T17:33:29Z"
+completed: "2026-09-09T17:37:11Z"
 ---
 
 # Tee the request path: single publish call site, body buffering, error isolation

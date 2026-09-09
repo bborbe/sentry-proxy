@@ -49,12 +49,14 @@ func CreateRoundTripper(
 	currentTime libtime.CurrentTimeGetter,
 	requestLimit int,
 	requestDuration time.Duration,
+	producer pkg.Producer,
 ) http.RoundTripper {
 	return pkg.NewRateLimitRoundTripper(
 		currentTime,
 		requestLimit,
 		requestDuration,
 		metrics,
+		producer,
 		libhttp.CreateDefaultRoundTripper(),
 	)
 }
@@ -66,9 +68,10 @@ func CreateProxyHandler(
 	requestLimit int,
 	requestDuration time.Duration,
 	parsedURL *url.URL,
+	producer pkg.Producer,
 ) http.Handler {
 	return libhttp.NewProxy(
-		CreateRoundTripper(metrics, currentTime, requestLimit, requestDuration),
+		CreateRoundTripper(metrics, currentTime, requestLimit, requestDuration, producer),
 		parsedURL,
 		libhttp.NewSentryProxyErrorHandler(sentryClient),
 	)

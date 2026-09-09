@@ -23,6 +23,7 @@ func NewRateLimitRoundTripper(
 	requestLimit int,
 	requestDuration time.Duration,
 	metrics Metrics,
+	producer Producer,
 	roundTripper http.RoundTripper,
 ) http.RoundTripper {
 	var mux sync.Mutex
@@ -31,29 +32,45 @@ func NewRateLimitRoundTripper(
 	return libhttp.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		ctx := req.Context()
 		metrics.SentryAlertTotalInc()
-		uptime := currentTimeGetter.Now().Sub(started)
+
+		now := currentTimeGetter.Now()
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, errors.Wrap(ctx, err, "read body failed")
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+
+		project := extractProject(req.URL.Path)
+		outcome := "forwarded"
+
+		uptime := now.Sub(started)
 		limit := uint64(float64(requestLimit) * float64(uptime/requestDuration))
 		glog.V(4).
 			Infof("requestLimit(%d) * uptime(%v)/requestDuration(%v) = %d", requestLimit, uptime, requestDuration, limit)
+
+		var response *http.Response
 		if requestCounter >= limit {
+			outcome = "rejected"
 			glog.V(2).Infof("requestCounter(%d) >= limit(%d) => 429", requestCounter, limit)
 			metrics.SentryAlertRejectedInc()
 			defer req.Body.Close()
-			body, err := io.ReadAll(req.Body)
-			if err != nil {
-				return nil, errors.Wrap(ctx, err, "read body failed")
-			}
 			glog.V(2).Infof("sentry alert rejected: %s", string(body))
-			return &http.Response{
+			response = &http.Response{
 				Body:       io.NopCloser(bytes.NewBufferString("reached request limit => 429")),
 				StatusCode: http.StatusTooManyRequests,
-			}, nil
+			}
+		} else {
+			mux.Lock()
+			metrics.SentryAlertForwardInc()
+			requestCounter = requestCounter + 1
+			mux.Unlock()
+			response, err = roundTripper.RoundTrip(req)
+			if err != nil {
+				outcome = "upstream_error"
+			}
 		}
-		mux.Lock()
-		metrics.SentryAlertForwardInc()
-		requestCounter = requestCounter + 1
-		glog.V(4).Infof("increase requestCounter to %d", requestCounter)
-		mux.Unlock()
-		return roundTripper.RoundTrip(req)
+
+		producer.Publish(body, project, now, outcome)
+		return response, err
 	})
 }
