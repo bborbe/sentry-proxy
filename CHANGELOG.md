@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.3.4
 
 - fix: Enforce the request budget as a sliding window — at most `REQUEST_LIMIT` requests are forwarded in any `REQUEST_DURATION` span, timestamp-pruned per request from the injected clock instead of the cumulative uptime-based counter that truncated partial windows to zero; rejections are now logged at warn level instead of `glog.V(2)` only.
 
