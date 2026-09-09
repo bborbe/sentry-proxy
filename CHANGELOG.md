@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- fix: Enforce the request budget as a sliding window — at most `REQUEST_LIMIT` requests are forwarded in any `REQUEST_DURATION` span, timestamp-pruned per request from the injected clock instead of the cumulative uptime-based counter that truncated partial windows to zero; rejections are now logged at warn level instead of `glog.V(2)` only.
+
 ## v0.3.3
 
 - docs: track `CLAUDE.md` in git instead of gitignoring it, and correct its contents. It described a Kafka Topic Reader service — wrong project, five `pkg/` files that do not exist, and IBM Sarama listed as a key dependency when there is no Kafka client in `go.mod`. Being gitignored, it was also absent from every feature worktree, so dark-factory containers ran here with no project instructions at all.
