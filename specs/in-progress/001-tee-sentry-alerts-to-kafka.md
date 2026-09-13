@@ -1,8 +1,9 @@
 ---
-status: prompted
+status: verifying
 approved: "2026-09-08T21:16:17Z"
 generating: "2026-09-09T15:13:51Z"
 prompted: "2026-09-09T15:13:51Z"
+verifying: "2026-09-13T13:35:22Z"
 branch: dark-factory/tee-sentry-alerts-to-kafka
 ---
 

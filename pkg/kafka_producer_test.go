@@ -81,7 +81,7 @@ var _ = Describe("Kafka Producer", func() {
 
 		Expect(producer.Run(ctx)).To(BeNil())
 		Expect(
-			metricValue(registry, "sentry_proxy_kafka_publish_counter", "failure"),
+			metricValue(registry, "sentry_proxy_kafka_publishes_total", "failure"),
 		).To(Equal(1.0))
 	})
 
@@ -105,7 +105,7 @@ var _ = Describe("Kafka Producer", func() {
 
 		Expect(producer.Run(ctx)).To(BeNil())
 		Expect(
-			metricValue(registry, "sentry_proxy_kafka_publish_counter", "success"),
+			metricValue(registry, "sentry_proxy_kafka_publishes_total", "success"),
 		).To(Equal(1.0))
 	})
 
@@ -132,7 +132,7 @@ var _ = Describe("Kafka Producer", func() {
 		)
 
 		Expect(
-			metricValue(registry, "sentry_proxy_kafka_publish_counter", "dropped"),
+			metricValue(registry, "sentry_proxy_kafka_publishes_total", "dropped"),
 		).To(Equal(1.0))
 	})
 
@@ -306,6 +306,10 @@ var _ = Describe("Kafka Producer", func() {
 	)
 })
 
+// metricValue returns the value of the metric in familyName carrying
+// result=labelValue, or -1 when that series is absent.
+//
+//nolint:unparam // familyName is part of the helper's contract, not a constant
 func metricValue(registry *prometheus.Registry, familyName string, labelValue string) float64 {
 	families, err := registry.Gather()
 	Expect(err).NotTo(HaveOccurred())
@@ -316,7 +320,7 @@ func metricValue(registry *prometheus.Registry, familyName string, labelValue st
 		for _, metric := range family.GetMetric() {
 			for _, labelPair := range metric.GetLabel() {
 				if labelPair.GetName() == "result" && labelPair.GetValue() == labelValue {
-					return metric.GetGauge().GetValue()
+					return metric.GetCounter().GetValue()
 				}
 			}
 		}
