@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- fix: register the proxy metrics as counters and give them `_total` names (`sentry_proxy_alerts_total`, `sentry_proxy_alerts_rejected_total`, `sentry_proxy_alerts_forwarded_total`, `sentry_proxy_kafka_publishes_total`), so rate/increase queries are no longer computed over gauges
+
 ## v0.4.0
 
 - feat: tee every received Sentry alert to a Kafka topic as a durable record (`docs/kafka-alert-record.md`) before the rate-limit or forwarding decision, keyed by project; new required config `KAFKA_BROKERS` / `KAFKA_TOPIC`

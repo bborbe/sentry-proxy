@@ -19,29 +19,21 @@ type Metrics interface {
 }
 
 func NewMetrics(registerer prometheus.Registerer) Metrics {
-	sentryAlertTotalCounter := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "sentry_proxy",
-		Subsystem: "total",
-		Name:      "counter",
-		Help:      "Counter for all sentryAlerts",
+	sentryAlertTotalCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "sentry_proxy_alerts_total",
+		Help: "Counter for all sentryAlerts",
 	})
-	sentryAlertRejectCounter := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "sentry_proxy",
-		Subsystem: "reject",
-		Name:      "counter",
-		Help:      "Counter for rejected sentryAlerts",
+	sentryAlertRejectCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "sentry_proxy_alerts_rejected_total",
+		Help: "Counter for rejected sentryAlerts",
 	})
-	sentryAlertForwardCounter := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "sentry_proxy",
-		Subsystem: "forward",
-		Name:      "counter",
-		Help:      "Counter for forwarded sentryAlerts",
+	sentryAlertForwardCounter := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "sentry_proxy_alerts_forwarded_total",
+		Help: "Counter for forwarded sentryAlerts",
 	})
-	kafkaPublishCounter := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "sentry_proxy",
-		Subsystem: "kafka_publish",
-		Name:      "counter",
-		Help:      "Counter for kafka publishes by result",
+	kafkaPublishCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "sentry_proxy_kafka_publishes_total",
+		Help: "Counter for kafka publishes by result",
 	}, []string{"result"})
 	for _, result := range []string{"success", "failure", "dropped"} {
 		kafkaPublishCounter.WithLabelValues(result).Add(0)
@@ -63,10 +55,10 @@ func NewMetrics(registerer prometheus.Registerer) Metrics {
 }
 
 type metrics struct {
-	sentryAlertForwardCounter prometheus.Gauge
-	sentryAlertRejectCounter  prometheus.Gauge
-	sentryAlertTotalCounter   prometheus.Gauge
-	kafkaPublishCounter       *prometheus.GaugeVec
+	sentryAlertForwardCounter prometheus.Counter
+	sentryAlertRejectCounter  prometheus.Counter
+	sentryAlertTotalCounter   prometheus.Counter
+	kafkaPublishCounter       *prometheus.CounterVec
 }
 
 func (m *metrics) SentryAlertTotalInc() {
