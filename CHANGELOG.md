@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.4.1
 
 - fix: register the proxy metrics as counters and give them `_total` names (`sentry_proxy_alerts_total`, `sentry_proxy_alerts_rejected_total`, `sentry_proxy_alerts_forwarded_total`, `sentry_proxy_kafka_publishes_total`), so rate/increase queries are no longer computed over gauges
 
