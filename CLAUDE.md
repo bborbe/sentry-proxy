@@ -10,10 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. Create spec → `/dark-factory:create-spec`
 2. Audit spec → `/dark-factory:audit-spec`
-3. User confirms → `dark-factory spec approve <name>`
+3. Approve the spec → `dark-factory spec approve <name>`
 4. dark-factory auto-generates prompts from spec
 5. Audit prompts → `/dark-factory:audit-prompt`
-6. User confirms → `dark-factory prompt approve <name>`
+6. Approve the prompt → `dark-factory prompt approve <name>`
 7. Start daemon → `dark-factory daemon` (use Bash `run_in_background: true`)
 8. dark-factory executes prompts automatically
 
@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. Create prompt → `/dark-factory:create-prompt`
 2. Audit prompt → `/dark-factory:audit-prompt`
-3. User confirms → `dark-factory prompt approve <name>`
+3. Approve the prompt → `dark-factory prompt approve <name>`
 4. Start daemon → `dark-factory daemon` (use Bash `run_in_background: true`)
 5. dark-factory executes prompt automatically
 
@@ -67,7 +67,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Never number filenames — dark-factory assigns numbers on approve
 - Never manually edit frontmatter status — use CLI commands above
 - Always audit before approving (`/dark-factory:audit-prompt`, `/dark-factory:audit-spec`)
-- **BLOCKING: Never run `dark-factory prompt approve`, `dark-factory spec approve`, or `dark-factory daemon` without explicit user confirmation.** Write the prompt/spec, then STOP and ask the user to approve. Do not assume approval from prior context or task momentum.
+- Run `dark-factory prompt approve` / `dark-factory spec approve` yourself once the prompt/spec passed its auditor (global rule execution-phase-no-reask)
 - **Before starting daemon** — run `dark-factory status` first to check if one is already running. Only start if not running.
 - **Start daemon in background** — use Bash tool with `run_in_background: true` (not foreground, not detached with `&`)
 
