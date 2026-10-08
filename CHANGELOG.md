@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: update github.com/IBM/sarama to v1.61.1, github.com/bborbe/errors to v1.6.1, github.com/bborbe/kafka to v1.26.0, github.com/bborbe/log to v1.7.1, github.com/bborbe/metrics to v0.6.3, github.com/bborbe/run to v1.11.0, github.com/bborbe/sentry to v1.10.2, github.com/bborbe/service to v1.10.14, github.com/bborbe/validation to v1.5.2, github.com/onsi/ginkgo/v2 to v2.33.0, github.com/onsi/gomega to v1.44.0, github.com/prometheus/client_golang to v1.25.0
+
 ## v0.4.2
 
 - docs: Remove the dark-factory approval gate from this repo's `CLAUDE.md`. It contradicted the global `execution-phase-no-reask` carve-out and would have stopped every spec and prompt approval.
