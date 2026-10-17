@@ -1,5 +1,12 @@
 ---
-status: draft
+status: completed
+summary: Added a per-project rate-limit window in front of the unchanged global window, keyed on extractProject, bounded by prune/sweep/hard-max, with a REQUEST_LIMIT_PER_PROJECT knob, a scope-labelled trip counter, and tests plus docs
+execution_id: sentry-proxy-ratelimit-perproject-exec-005-per-project-ratelimit-window
+dark-factory-version: v0.198.7
+created: "2026-10-17T21:54:52Z"
+queued: "2026-10-17T21:54:52Z"
+started: "2026-10-17T21:55:45Z"
+completed: "2026-10-17T22:02:08Z"
 ---
 
 # Key the rate-limit window by project so one burst cannot starve the rest

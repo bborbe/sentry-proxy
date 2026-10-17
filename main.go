@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	stderrors "errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,22 +34,37 @@ func main() {
 	os.Exit(service.Main(context.Background(), app, &app.SentryDSN, &app.SentryProxy))
 }
 
+// ErrRequestLimitPerProjectOutOfRange is returned when REQUEST_LIMIT_PER_PROJECT
+// is outside the range the limiter's two-level admission rule can honour: at
+// least one request per project, and never more than the global window allows.
+var ErrRequestLimitPerProjectOutOfRange = stderrors.New(
+	"requestLimitPerProject must be >= 1 and <= requestLimit",
+)
+
 type application struct {
-	SentryDSN       string            `required:"true"  arg:"sentry-dsn"        env:"SENTRY_DSN"        usage:"SentryDSN"                                                display:"length"`
-	SentryProxy     string            `required:"false" arg:"sentry-proxy"      env:"SENTRY_PROXY"      usage:"Sentry Proxy"`
-	Listen          string            `required:"true"  arg:"listen"            env:"LISTEN"            usage:"address to listen to"`
-	RequestLimit    int               `required:"true"  arg:"request-limit"     env:"REQUEST_LIMIT"     usage:"request limit"`
-	RequestDuration time.Duration     `required:"true"  arg:"request-duration"  env:"REQUEST_DURATION"  usage:"request limit duration"`
-	KafkaBrokers    libkafka.Brokers  `required:"true"  arg:"kafka-brokers"     env:"KAFKA_BROKERS"     usage:"Kafka brokers"`
-	KafkaTopic      string            `required:"true"  arg:"kafka-topic"       env:"KAFKA_TOPIC"       usage:"Kafka topic"`
-	BuildGitVersion string            `required:"false" arg:"build-git-version" env:"BUILD_GIT_VERSION" usage:"Build Git version (git describe --tags --always --dirty)"                  default:"dev"`
-	BuildGitCommit  string            `required:"false" arg:"build-git-commit"  env:"BUILD_GIT_COMMIT"  usage:"Build Git commit hash"                                                     default:"none"`
-	BuildDate       *libtime.DateTime `required:"false" arg:"build-date"        env:"BUILD_DATE"        usage:"Build timestamp (RFC3339)"`
+	SentryDSN              string            `required:"true"  arg:"sentry-dsn"                env:"SENTRY_DSN"                usage:"SentryDSN"                                                display:"length"`
+	SentryProxy            string            `required:"false" arg:"sentry-proxy"              env:"SENTRY_PROXY"              usage:"Sentry Proxy"`
+	Listen                 string            `required:"true"  arg:"listen"                    env:"LISTEN"                    usage:"address to listen to"`
+	RequestLimit           int               `required:"true"  arg:"request-limit"             env:"REQUEST_LIMIT"             usage:"request limit"`
+	RequestLimitPerProject int               `required:"false" arg:"request-limit-per-project" env:"REQUEST_LIMIT_PER_PROJECT" usage:"request limit per project"                                                 default:"1"`
+	RequestDuration        time.Duration     `required:"true"  arg:"request-duration"          env:"REQUEST_DURATION"          usage:"request limit duration"`
+	KafkaBrokers           libkafka.Brokers  `required:"true"  arg:"kafka-brokers"             env:"KAFKA_BROKERS"             usage:"Kafka brokers"`
+	KafkaTopic             string            `required:"true"  arg:"kafka-topic"               env:"KAFKA_TOPIC"               usage:"Kafka topic"`
+	BuildGitVersion        string            `required:"false" arg:"build-git-version"         env:"BUILD_GIT_VERSION"         usage:"Build Git version (git describe --tags --always --dirty)"                  default:"dev"`
+	BuildGitCommit         string            `required:"false" arg:"build-git-commit"          env:"BUILD_GIT_COMMIT"          usage:"Build Git commit hash"                                                     default:"none"`
+	BuildDate              *libtime.DateTime `required:"false" arg:"build-date"                env:"BUILD_DATE"                usage:"Build timestamp (RFC3339)"`
 }
 
 func (a *application) Validate(ctx context.Context) error {
 	if err := libkafka.Topic(a.KafkaTopic).Validate(ctx); err != nil {
 		return errors.Wrap(ctx, err, "validate kafka topic failed")
+	}
+	if a.RequestLimitPerProject < 1 || a.RequestLimitPerProject > a.RequestLimit {
+		return errors.Wrap(
+			ctx,
+			ErrRequestLimitPerProjectOutOfRange,
+			"validate requestLimitPerProject failed",
+		)
 	}
 	return nil
 }
@@ -95,6 +111,7 @@ func (a *application) createHTTPServer(
 				sentryClient,
 				currentTime,
 				a.RequestLimit,
+				a.RequestLimitPerProject,
 				a.RequestDuration,
 				parsedURL,
 				producer,

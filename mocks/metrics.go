@@ -24,6 +24,11 @@ type Metrics struct {
 	sentryAlertForwardIncMutex       sync.RWMutex
 	sentryAlertForwardIncArgsForCall []struct {
 	}
+	SentryAlertLimitTrippedIncStub        func(string)
+	sentryAlertLimitTrippedIncMutex       sync.RWMutex
+	sentryAlertLimitTrippedIncArgsForCall []struct {
+		arg1 string
+	}
 	SentryAlertRejectedIncStub        func()
 	sentryAlertRejectedIncMutex       sync.RWMutex
 	sentryAlertRejectedIncArgsForCall []struct {
@@ -130,6 +135,38 @@ func (fake *Metrics) SentryAlertForwardIncCalls(stub func()) {
 	fake.sentryAlertForwardIncMutex.Lock()
 	defer fake.sentryAlertForwardIncMutex.Unlock()
 	fake.SentryAlertForwardIncStub = stub
+}
+
+func (fake *Metrics) SentryAlertLimitTrippedInc(arg1 string) {
+	fake.sentryAlertLimitTrippedIncMutex.Lock()
+	fake.sentryAlertLimitTrippedIncArgsForCall = append(fake.sentryAlertLimitTrippedIncArgsForCall, struct {
+		arg1 string
+	}{arg1})
+	stub := fake.SentryAlertLimitTrippedIncStub
+	fake.recordInvocation("SentryAlertLimitTrippedInc", []interface{}{arg1})
+	fake.sentryAlertLimitTrippedIncMutex.Unlock()
+	if stub != nil {
+		fake.SentryAlertLimitTrippedIncStub(arg1)
+	}
+}
+
+func (fake *Metrics) SentryAlertLimitTrippedIncCallCount() int {
+	fake.sentryAlertLimitTrippedIncMutex.RLock()
+	defer fake.sentryAlertLimitTrippedIncMutex.RUnlock()
+	return len(fake.sentryAlertLimitTrippedIncArgsForCall)
+}
+
+func (fake *Metrics) SentryAlertLimitTrippedIncCalls(stub func(string)) {
+	fake.sentryAlertLimitTrippedIncMutex.Lock()
+	defer fake.sentryAlertLimitTrippedIncMutex.Unlock()
+	fake.SentryAlertLimitTrippedIncStub = stub
+}
+
+func (fake *Metrics) SentryAlertLimitTrippedIncArgsForCall(i int) string {
+	fake.sentryAlertLimitTrippedIncMutex.RLock()
+	defer fake.sentryAlertLimitTrippedIncMutex.RUnlock()
+	argsForCall := fake.sentryAlertLimitTrippedIncArgsForCall[i]
+	return argsForCall.arg1
 }
 
 func (fake *Metrics) SentryAlertRejectedInc() {

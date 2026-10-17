@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- feat: cap each project at its own share of the rate-limit window via the new `REQUEST_LIMIT_PER_PROJECT` knob (default `1`, bounded by `REQUEST_LIMIT`), so one project's burst can no longer occupy the whole budget and starve every other project. The total allowance is unchanged — the per-project window is a second veto that only ever removes admissions, and the global window is still checked first. Requests whose project cannot be determined are capped as the ordinary project `unknown` rather than exempted, and the new `sentry_proxy_alerts_limit_tripped_total{scope}` counter records which limit tripped (`global` or `project`).
+
 ## v0.4.5
 
 - fix: bump `osv-scanner` to v2.6.0 so the Linux vulnerability gates stop failing. v2.3.1 pins `golang.org/x/tools` v0.38.0, whose SSA builder aborts with `unexpected expr: *ast.KeyValueExpr` on the promoted-field composite-literal key Go 1.27 permits in the Linux stdlib, so a repo on the old pin passes locally on darwin and fails only in Linux CI. Where `golang.org/x/net` is older than v0.60.0 it is raised to v0.60.0, clearing `GO-2026-6603/6610/6611/6612/6617`, which fail both `vulncheck` and `trivy`.
