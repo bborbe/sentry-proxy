@@ -56,6 +56,10 @@ func NewRateLimitRoundTripper(
 		}
 		req.Body = io.NopCloser(bytes.NewReader(body))
 
+		// The tee publishes a decompressed copy — see teeBody for why the
+		// compressed bytes cannot survive the record's JSON string encoding.
+		teePayload := teeBody(req.Header, body)
+
 		project := extractProject(req.URL.Path)
 		outcome := "forwarded"
 
@@ -91,7 +95,7 @@ func NewRateLimitRoundTripper(
 			metrics.SentryAlertLimitTrippedInc(rejectScope)
 			metrics.SentryAlertRejectedInc()
 			defer req.Body.Close()
-			glog.Warningf("sentry alert rejected: %s", string(body))
+			glog.Warningf("sentry alert rejected: %s", string(teePayload))
 			response = &http.Response{
 				Body:       io.NopCloser(bytes.NewBufferString("reached request limit => 429")),
 				StatusCode: http.StatusTooManyRequests,
@@ -107,7 +111,7 @@ func NewRateLimitRoundTripper(
 			}
 		}
 
-		producer.Publish(body, project, now, outcome)
+		producer.Publish(teePayload, project, now, outcome)
 		return response, err
 	})
 }

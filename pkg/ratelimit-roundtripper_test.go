@@ -6,6 +6,7 @@ package pkg_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"net/http"
@@ -616,3 +617,194 @@ var _ = Describe("RateLimitRoundTripper per-project limit", func() {
 		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
 	})
 })
+
+// The tee publishes a decompressed copy of a gzip'd request body. Without it the
+// compressed bytes reach the topic as a JSON string, encoding/json coerces the
+// gzip header's 0x8b to U+FFFD, and the record becomes undecodable for every
+// consumer. See pkg/tee-body.go.
+var _ = Describe("RateLimitRoundTripper gzip tee body", func() {
+	It("publishes the decompressed envelope and still sends the compressed bytes upstream", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		var receivedBodies [][]byte
+		server, innerRT := newUpstream(&receivedBodies)
+		defer server.Close()
+		roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		envelope := []byte("{\"event_id\":\"abc\"}\n{\"type\":\"event\"}")
+		compressed := gzipBytes(envelope)
+
+		resp, err := roundTripper.RoundTrip(newBodyRequest(
+			compressed,
+			http.Header{"Content-Encoding": []string{"gzip"}},
+		))
+		Expect(err).NotTo(HaveOccurred())
+		resp.Body.Close()
+
+		Expect(fake.PublishCallCount()).To(Equal(1))
+		body, project, _, outcome := fake.PublishArgsForCall(0)
+		Expect(outcome).To(Equal("forwarded"))
+		Expect(project).To(Equal("project-a"))
+		Expect(body).To(Equal(envelope))
+		// The upstream still receives the original compressed bytes: the fix
+		// changes what the topic carries, never what Sentry is sent.
+		Expect(receivedBodies).To(Equal([][]byte{compressed}))
+	})
+
+	It("decompresses a gzip body whose sender declared no Content-Encoding", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		server, innerRT := newUpstream(nil)
+		defer server.Close()
+		roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		envelope := []byte("{\"event_id\":\"abc\"}")
+		resp, err := roundTripper.RoundTrip(newBodyRequest(
+			gzipBytes(envelope),
+			nil,
+		))
+		Expect(err).NotTo(HaveOccurred())
+		resp.Body.Close()
+
+		body, _, _, _ := fake.PublishArgsForCall(0)
+		Expect(body).To(Equal(envelope))
+	})
+
+	It(
+		"publishes the body unchanged when Content-Encoding claims gzip but the bytes are not",
+		func() {
+			fake := &mocks.Producer{}
+			currentTime := libtime.NewCurrentTime()
+			currentTime.SetNow(base)
+			server, innerRT := newUpstream(nil)
+			defer server.Close()
+			roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+			currentTime.SetNow(base.Add(2 * time.Hour))
+
+			plain := []byte("{\"event_id\":\"abc\"}")
+			resp, err := roundTripper.RoundTrip(newBodyRequest(
+				plain,
+				http.Header{"Content-Encoding": []string{"gzip"}},
+			))
+			Expect(err).NotTo(HaveOccurred())
+			resp.Body.Close()
+
+			// A wrong guess must never corrupt a record: the tee publishes what it
+			// cannot decode rather than dropping or mangling it.
+			body, _, _, _ := fake.PublishArgsForCall(0)
+			Expect(body).To(Equal(plain))
+		},
+	)
+
+	It("publishes a plain body unchanged", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		server, innerRT := newUpstream(nil)
+		defer server.Close()
+		roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		resp, err := roundTripper.RoundTrip(newTestRequest("/api/project-a/envelope/"))
+		Expect(err).NotTo(HaveOccurred())
+		resp.Body.Close()
+
+		body, _, _, _ := fake.PublishArgsForCall(0)
+		Expect(body).To(Equal([]byte("envelope-bytes")))
+	})
+
+	It("decompresses the body on the rejected path too", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		server, innerRT := newUpstream(nil)
+		defer server.Close()
+		roundTripper := pkg.NewRateLimitRoundTripper(
+			currentTime,
+			1,
+			1,
+			time.Hour,
+			&mocks.Metrics{},
+			fake,
+			innerRT,
+		)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		envelope := []byte("{\"event_id\":\"abc\"}")
+		compressed := gzipBytes(envelope)
+		header := http.Header{"Content-Encoding": []string{"gzip"}}
+
+		first, err := roundTripper.RoundTrip(
+			newBodyRequest(compressed, header),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		first.Body.Close()
+		Expect(first.StatusCode).To(Equal(http.StatusOK))
+
+		second, err := roundTripper.RoundTrip(
+			newBodyRequest(compressed, header),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		second.Body.Close()
+		Expect(second.StatusCode).To(Equal(http.StatusTooManyRequests))
+
+		body, _, _, outcome := fake.PublishArgsForCall(1)
+		Expect(outcome).To(Equal("rejected"))
+		Expect(body).To(Equal(envelope))
+	})
+
+	It("publishes the compressed body when it expands beyond the cap", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		server, innerRT := newUpstream(nil)
+		defer server.Close()
+		roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		// Highly compressible, so the wire size stays small while the decoded
+		// size runs past the cap: the shape a decompression bomb takes.
+		compressed := gzipBytes(make([]byte, 9<<20))
+		Expect(len(compressed)).To(BeNumerically("<", 1<<20))
+
+		resp, err := roundTripper.RoundTrip(newBodyRequest(
+			compressed,
+			http.Header{"Content-Encoding": []string{"gzip"}},
+		))
+		Expect(err).NotTo(HaveOccurred())
+		resp.Body.Close()
+
+		// The tee publishes what it will not decode, rather than expanding it.
+		body, _, _, _ := fake.PublishArgsForCall(0)
+		Expect(body).To(Equal(compressed))
+	})
+})
+
+// newBodyRequest builds a project-a ingest request carrying the given body and
+// headers.
+func newBodyRequest(body []byte, header http.Header) *http.Request {
+	if header == nil {
+		header = http.Header{}
+	}
+	return &http.Request{
+		Method: http.MethodPost,
+		URL:    &url.URL{Path: "/api/project-a/envelope/"},
+		Body:   io.NopCloser(bytes.NewReader(body)),
+		Header: header,
+	}
+}
+
+// gzipBytes returns raw gzip-compressed bytes — the encoding Sentry SDKs use for
+// their envelope POSTs.
+func gzipBytes(raw []byte) []byte {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+	_, err := writer.Write(raw)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(writer.Close()).To(Succeed())
+	return buf.Bytes()
+}
