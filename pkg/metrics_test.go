@@ -36,7 +36,13 @@ var _ = Describe("Metrics", func() {
 			"sentry_proxy_alerts_rejected_total",
 			"sentry_proxy_alerts_forwarded_total",
 			"sentry_proxy_kafka_publishes_total",
+			"sentry_proxy_alerts_limit_tripped_total",
 		))
+	})
+
+	It("pre-initializes every limit trip scope series to zero", func() {
+		Expect(limitTrippedValue(registry, "global")).To(Equal(0.0))
+		Expect(limitTrippedValue(registry, "project")).To(Equal(0.0))
 	})
 
 	It("pre-initializes every kafka publish result series to zero", func() {
@@ -67,6 +73,28 @@ var _ = Describe("Metrics", func() {
 		).To(Equal(1.0))
 	})
 })
+
+// limitTrippedValue returns the value of the
+// sentry_proxy_alerts_limit_tripped_total series carrying scope=scope, or -1
+// when that series is absent. It mirrors metricValue, which filters on the
+// "result" label of the kafka publish counter instead.
+func limitTrippedValue(registry *prometheus.Registry, scope string) float64 {
+	families, err := registry.Gather()
+	Expect(err).NotTo(HaveOccurred())
+	for _, family := range families {
+		if family.GetName() != "sentry_proxy_alerts_limit_tripped_total" {
+			continue
+		}
+		for _, metric := range family.GetMetric() {
+			for _, labelPair := range metric.GetLabel() {
+				if labelPair.GetName() == "scope" && labelPair.GetValue() == scope {
+					return metric.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+	return -1
+}
 
 // alertCounterValue returns the value of the single metric in the named
 // label-less family, or -1 when the family or its metric is absent.

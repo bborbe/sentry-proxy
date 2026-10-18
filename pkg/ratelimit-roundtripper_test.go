@@ -67,6 +67,7 @@ var _ = Describe("RateLimitRoundTripper", func() {
 			roundTripper := pkg.NewRateLimitRoundTripper(
 				currentTime,
 				1,
+				1,
 				time.Hour,
 				&mocks.Metrics{},
 				fake,
@@ -280,6 +281,7 @@ func newRateLimitRoundTripper(
 	return pkg.NewRateLimitRoundTripper(
 		currentTime,
 		100,
+		100,
 		time.Hour,
 		&mocks.Metrics{},
 		producer,
@@ -410,6 +412,7 @@ var _ = Describe("RateLimitRoundTripper sliding window", func() {
 		return pkg.NewRateLimitRoundTripper(
 			currentTime,
 			limit,
+			limit,
 			1*time.Hour,
 			fakeMetrics,
 			&mocks.Producer{},
@@ -498,5 +501,118 @@ var _ = Describe("RateLimitRoundTripper sliding window", func() {
 			Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(4))
 			Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(4))
 		})
+	})
+})
+
+var _ = Describe("RateLimitRoundTripper per-project limit", func() {
+	var (
+		baseTime     time.Time
+		currentTime  libtime.CurrentTime
+		fakeMetrics  *mocks.Metrics
+		upstream     http.RoundTripper
+		roundTripper http.RoundTripper
+	)
+
+	BeforeEach(func() {
+		baseTime = time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+		currentTime = libtime.NewCurrentTime()
+		currentTime.SetNow(baseTime)
+		fakeMetrics = &mocks.Metrics{}
+		upstream = libhttp.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewBufferString("ok")),
+			}, nil
+		})
+	})
+
+	newPerProjectRoundTripper := func(requestLimit, requestLimitPerProject int) http.RoundTripper {
+		return pkg.NewRateLimitRoundTripper(
+			currentTime,
+			requestLimit,
+			requestLimitPerProject,
+			1*time.Hour,
+			fakeMetrics,
+			&mocks.Producer{},
+			upstream,
+		)
+	}
+
+	doRequest := func(path string) *http.Response {
+		resp, err := roundTripper.RoundTrip(newTestRequest(path))
+		Expect(err).NotTo(HaveOccurred())
+		return resp
+	}
+
+	It("caps one project without starving another in the same window", func() {
+		roundTripper = newPerProjectRoundTripper(2, 1)
+
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).
+			To(Equal(http.StatusTooManyRequests))
+		Expect(doRequest("/api/project-b/envelope/").StatusCode).To(Equal(http.StatusOK))
+
+		Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(2))
+		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncArgsForCall(0)).To(Equal("project"))
+	})
+
+	It("keeps the aggregate allowance at requestLimit per window", func() {
+		roundTripper = newPerProjectRoundTripper(2, 1)
+
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+		Expect(doRequest("/api/project-b/envelope/").StatusCode).To(Equal(http.StatusOK))
+		Expect(doRequest("/api/project-c/envelope/").StatusCode).
+			To(Equal(http.StatusTooManyRequests))
+
+		Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(2))
+		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncArgsForCall(0)).To(Equal("global"))
+	})
+
+	It("lets a capped project forward again once its own window expires", func() {
+		roundTripper = newPerProjectRoundTripper(2, 1)
+
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).
+			To(Equal(http.StatusTooManyRequests))
+
+		currentTime.SetNow(baseTime.Add(1 * time.Hour))
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+
+		Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(2))
+		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+	})
+
+	It("caps an unmatched path as the ordinary project unknown", func() {
+		roundTripper = newPerProjectRoundTripper(2, 1)
+
+		Expect(doRequest("/other/path").StatusCode).To(Equal(http.StatusOK))
+		Expect(doRequest("/api/").StatusCode).To(Equal(http.StatusTooManyRequests))
+
+		Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncCallCount()).To(Equal(1))
+		Expect(fakeMetrics.SentryAlertLimitTrippedIncArgsForCall(0)).To(Equal("project"))
+	})
+
+	It("does not extend the project window on rejection", func() {
+		roundTripper = newPerProjectRoundTripper(2, 1)
+
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+
+		currentTime.SetNow(baseTime.Add(1 * time.Minute))
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).
+			To(Equal(http.StatusTooManyRequests))
+
+		// The rejected request must not have appended to project-a's window: if it
+		// had, its 12:01 entry would still be live and this request would be capped.
+		currentTime.SetNow(baseTime.Add(1 * time.Hour))
+		Expect(doRequest("/api/project-a/envelope/").StatusCode).To(Equal(http.StatusOK))
+
+		Expect(fakeMetrics.SentryAlertForwardIncCallCount()).To(Equal(2))
+		Expect(fakeMetrics.SentryAlertRejectedIncCallCount()).To(Equal(1))
 	})
 })

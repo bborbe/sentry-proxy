@@ -18,10 +18,20 @@ import (
 )
 
 // NewRateLimitRoundTripper prevents forwarding more than requestLimit requests
-// within any sliding requestDuration window, answering 429 once the window is full.
+// within any sliding requestDuration window, answering 429 once that window is
+// full.
+//
+// Admission is a two-level decision evaluated under a single lock hold. The
+// global window is checked first and is unchanged: at most requestLimit requests
+// are forwarded in any requestDuration span. Only then is the per-project window
+// consulted, rejecting the request when the requesting project already holds
+// requestLimitPerProject entries in that same span. The per-project window is a
+// second veto only — it never admits a request the global window would have
+// refused, so the total allowance does not rise.
 func NewRateLimitRoundTripper(
 	currentTimeGetter libtime.CurrentTimeGetter,
 	requestLimit int,
+	requestLimitPerProject int,
 	requestDuration time.Duration,
 	metrics Metrics,
 	producer Producer,
@@ -29,6 +39,12 @@ func NewRateLimitRoundTripper(
 ) http.RoundTripper {
 	var mux sync.Mutex
 	var timestamps []time.Time
+	projects := newProjectWindows(
+		requestLimitPerProject,
+		requestDuration,
+		defaultProjectSweepThreshold,
+		defaultMaxProjects,
+	)
 	return libhttp.RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		ctx := req.Context()
 		metrics.SentryAlertTotalInc()
@@ -44,6 +60,7 @@ func NewRateLimitRoundTripper(
 		outcome := "forwarded"
 
 		var response *http.Response
+		rejectScope := ""
 		mux.Lock()
 		// prune leading window entries that are at least one full window old; an
 		// entry exactly requestDuration old drops out, so a request arriving at
@@ -53,9 +70,25 @@ func NewRateLimitRoundTripper(
 			pruned++
 		}
 		timestamps = timestamps[pruned:]
-		if len(timestamps) >= requestLimit {
-			outcome = "rejected"
+		switch {
+		case len(timestamps) >= requestLimit:
+			rejectScope = "global"
 			glog.Warningf("requestCounter(%d) >= limit(%d) => 429", len(timestamps), requestLimit)
+		case !projects.admit(project, now):
+			rejectScope = "project"
+			glog.Warningf(
+				"project(%s) reached requestLimitPerProject(%d) => 429",
+				project,
+				requestLimitPerProject,
+			)
+		default:
+			timestamps = append(timestamps, now)
+		}
+		if rejectScope != "" {
+			// a rejected request appends to neither window, so rejections never
+			// extend the global or the per-project window.
+			outcome = "rejected"
+			metrics.SentryAlertLimitTrippedInc(rejectScope)
 			metrics.SentryAlertRejectedInc()
 			defer req.Body.Close()
 			glog.Warningf("sentry alert rejected: %s", string(body))
@@ -65,7 +98,6 @@ func NewRateLimitRoundTripper(
 			}
 			mux.Unlock()
 		} else {
-			timestamps = append(timestamps, now)
 			metrics.SentryAlertForwardInc()
 			glog.V(4).Infof("increase requestCounter to %d", len(timestamps))
 			mux.Unlock()

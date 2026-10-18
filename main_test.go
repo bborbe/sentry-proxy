@@ -45,16 +45,62 @@ func TestAC8MissingKafkaConfigFailsStartup(t *testing.T) {
 	})
 }
 
+// TestRequestLimitPerProjectOutOfRangeFailsStartup asserts that a
+// REQUEST_LIMIT_PER_PROJECT outside the range the limiter can honour — below 1,
+// or above REQUEST_LIMIT — is rejected at startup rather than silently producing
+// a cap the two-level admission rule cannot express.
+func TestRequestLimitPerProjectOutOfRangeFailsStartup(t *testing.T) {
+	if os.Getenv("SENTRY_PROXY_AC8_HELPER") == "1" {
+		main()
+		return
+	}
+
+	for _, tc := range []struct {
+		name  string
+		value string
+	}{
+		{name: "zero", value: "0"},
+		{name: "above-request-limit", value: "101"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := runStartupSubprocess(
+				t,
+				"^TestRequestLimitPerProjectOutOfRangeFailsStartup$",
+				"KAFKA_BROKERS=localhost:9092",
+				"KAFKA_TOPIC=develop-raw-sentry-alert-input",
+				"REQUEST_LIMIT_PER_PROJECT="+tc.value,
+			)
+			if !bytes.Contains(out, []byte("validate requestLimitPerProject failed")) {
+				t.Fatalf(
+					"expected output to mention %q, got: %s",
+					"validate requestLimitPerProject failed",
+					out,
+				)
+			}
+		})
+	}
+}
+
 // runAC8Subprocess re-executes the current test binary in helper mode, stripping
 // both kafka env vars from the inherited environment so only the vars supplied
 // via extraEnv are effective. It asserts the subprocess exits non-zero (the
 // service.Main argument-parsing failure path) and returns its combined output.
 func runAC8Subprocess(t *testing.T, extraEnv ...string) []byte {
 	t.Helper()
+	return runStartupSubprocess(t, "^TestAC8MissingKafkaConfigFailsStartup$", extraEnv...)
+}
+
+// runStartupSubprocess re-executes the current test binary in helper mode with
+// the given -test.run pattern, stripping every env var the caller is expected to
+// supply explicitly. It asserts the subprocess exits non-zero and returns its
+// combined output.
+func runStartupSubprocess(t *testing.T, testName string, extraEnv ...string) []byte {
+	t.Helper()
 	// #nosec G204, G702 -- re-exec of the current test binary; os.Args[0] and
 	// the -test.run flag are trusted constants in this re-exec pattern
-	cmd := exec.Command(os.Args[0], "-test.run=^TestAC8MissingKafkaConfigFailsStartup$")
+	cmd := exec.Command(os.Args[0], "-test.run="+testName)
 	env := withoutEnv(withoutEnv(os.Environ(), "KAFKA_BROKERS"), "KAFKA_TOPIC")
+	env = withoutEnv(env, "REQUEST_LIMIT_PER_PROJECT")
 	env = append(env, ac8BaseEnv...)
 	env = append(env, extraEnv...)
 	cmd.Env = env

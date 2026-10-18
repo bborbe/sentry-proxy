@@ -91,14 +91,19 @@ every proxy instance enforces its own budget independently. See `## Rate limitin
 - **`pkg/`**
   - `ratelimit-roundtripper.go` — the budget. `NewRateLimitRoundTripper` wraps the
     outbound transport, counts forwarded requests, and returns a synthesised `429`
-    (never touching the network) once the allowance is spent.
-  - `metrics.go` — Prometheus counters: total received, forwarded, rejected.
+    (never touching the network) once either the global allowance or one project's
+    share of it is spent.
+  - `project-windows.go` — the per-project half of that budget: one timestamp-pruned
+    window per project, unsynchronised and bounded (per-request prune, threshold
+    sweep, hard maximum with least-recently-seen eviction).
+  - `metrics.go` — Prometheus counters: total received, forwarded, rejected, and
+    limit trips by scope.
   - `factory/factory.go` — dependency injection wiring for the metrics, round tripper
     and proxy handler.
   - `factory/factory_loglevel-handler.go` — runtime log-level handler.
 
 The service publishes every received alert to Kafka via `github.com/bborbe/kafka`;
-its only in-memory state is the request counter.
+its in-memory state is the global request window plus the bounded per-project windows.
 
 ### Configuration
 
@@ -108,17 +113,34 @@ its only in-memory state is the request counter.
 | `SENTRY_PROXY` | no | Proxy for this service's *own* error reporting |
 | `LISTEN` | yes | Listen address, e.g. `:9090` |
 | `REQUEST_LIMIT` | yes | Requests allowed per `REQUEST_DURATION` |
+| `REQUEST_LIMIT_PER_PROJECT` | no | Requests allowed per project per `REQUEST_DURATION` (default `1`; must be ≥ 1 and ≤ `REQUEST_LIMIT`) |
 | `REQUEST_DURATION` | yes | Budget window, e.g. `1h` |
 | `KAFKA_BROKERS` | yes | Kafka bootstrap brokers (comma-separated; `plain://` assumed) |
 | `KAFKA_TOPIC` | yes | Kafka topic to publish received alert records to |
 
 ### Rate limiting
 
-The budget is a timestamp-pruned sliding window: at most `REQUEST_LIMIT` requests are
-forwarded in any `REQUEST_DURATION` span, with no banking — a quiet period does not build
-up allowance that can be spent later. Rejections never extend the window, are logged at
-warn level and increment `SentryAlertRejected`, so a proxy dropping everything is
-observable without debug verbosity.
+The budget is a two-level admission rule over timestamp-pruned sliding windows, both
+evaluated under a single lock hold.
+
+The **global window** is unchanged: at most `REQUEST_LIMIT` requests are forwarded in any
+`REQUEST_DURATION` span, with no banking — a quiet period does not build up allowance that
+can be spent later. It is checked first.
+
+The **per-project window** is a second veto: the requesting project (the second path
+segment of `/api/{project_id}/…`) may hold at most `REQUEST_LIMIT_PER_PROJECT` entries in
+the same span. It only ever removes admissions the global window would have allowed, so
+the total never rises; a project rejected by it has not consumed a global slot. A path
+that does not match `/api/{id}/…` is treated as the ordinary project `unknown` and capped
+like any other — exempting it would let a malformed path bypass the cap. Per-project state
+is bounded by a per-request prune, a threshold sweep and a hard maximum with
+least-recently-seen eviction, because the key comes from a caller-controlled path.
+
+Rejections append to neither window, are logged at warn level, increment
+`SentryAlertRejected`, and record which limit tripped in
+`sentry_proxy_alerts_limit_tripped_total{scope}` (`global` or `project`) — so a proxy
+dropping everything is observable without debug verbosity, and a per-project cap doing the
+work is distinguishable from the aggregate being full.
 
 Read `pkg/ratelimit-roundtripper.go` before changing anything here; the arithmetic is
 subtler than the env-var names suggest.

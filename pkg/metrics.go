@@ -13,6 +13,9 @@ type Metrics interface {
 	SentryAlertTotalInc()
 	SentryAlertRejectedInc()
 	SentryAlertForwardInc()
+	// SentryAlertLimitTrippedInc counts which limit rejected a request: the
+	// global window ("global") or one project's share of it ("project").
+	SentryAlertLimitTrippedInc(scope string)
 	KafkaPublishSuccessInc()
 	KafkaPublishFailureInc()
 	KafkaPublishDroppedInc()
@@ -38,27 +41,37 @@ func NewMetrics(registerer prometheus.Registerer) Metrics {
 	for _, result := range []string{"success", "failure", "dropped"} {
 		kafkaPublishCounter.WithLabelValues(result).Add(0)
 	}
+	sentryAlertLimitTrippedCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "sentry_proxy_alerts_limit_tripped_total",
+		Help: "Counter for sentryAlerts rejected by the global or per-project limit",
+	}, []string{"scope"})
+	for _, scope := range []string{"global", "project"} {
+		sentryAlertLimitTrippedCounter.WithLabelValues(scope).Add(0)
+	}
 
 	registerer.MustRegister(
 		sentryAlertTotalCounter,
 		sentryAlertRejectCounter,
 		sentryAlertForwardCounter,
 		kafkaPublishCounter,
+		sentryAlertLimitTrippedCounter,
 	)
 
 	return &metrics{
-		sentryAlertTotalCounter:   sentryAlertTotalCounter,
-		sentryAlertRejectCounter:  sentryAlertRejectCounter,
-		sentryAlertForwardCounter: sentryAlertForwardCounter,
-		kafkaPublishCounter:       kafkaPublishCounter,
+		sentryAlertTotalCounter:        sentryAlertTotalCounter,
+		sentryAlertRejectCounter:       sentryAlertRejectCounter,
+		sentryAlertForwardCounter:      sentryAlertForwardCounter,
+		kafkaPublishCounter:            kafkaPublishCounter,
+		sentryAlertLimitTrippedCounter: sentryAlertLimitTrippedCounter,
 	}
 }
 
 type metrics struct {
-	sentryAlertForwardCounter prometheus.Counter
-	sentryAlertRejectCounter  prometheus.Counter
-	sentryAlertTotalCounter   prometheus.Counter
-	kafkaPublishCounter       *prometheus.CounterVec
+	sentryAlertForwardCounter      prometheus.Counter
+	sentryAlertRejectCounter       prometheus.Counter
+	sentryAlertTotalCounter        prometheus.Counter
+	kafkaPublishCounter            *prometheus.CounterVec
+	sentryAlertLimitTrippedCounter *prometheus.CounterVec
 }
 
 func (m *metrics) SentryAlertTotalInc() {
@@ -71,6 +84,10 @@ func (m *metrics) SentryAlertRejectedInc() {
 
 func (m *metrics) SentryAlertForwardInc() {
 	m.sentryAlertForwardCounter.Inc()
+}
+
+func (m *metrics) SentryAlertLimitTrippedInc(scope string) {
+	m.sentryAlertLimitTrippedCounter.WithLabelValues(scope).Inc()
 }
 
 func (m *metrics) KafkaPublishSuccessInc() {
