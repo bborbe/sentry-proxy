@@ -756,6 +756,32 @@ var _ = Describe("RateLimitRoundTripper gzip tee body", func() {
 		Expect(outcome).To(Equal("rejected"))
 		Expect(body).To(Equal(envelope))
 	})
+
+	It("publishes the compressed body when it expands beyond the cap", func() {
+		fake := &mocks.Producer{}
+		currentTime := libtime.NewCurrentTime()
+		currentTime.SetNow(base)
+		server, innerRT := newUpstream(nil)
+		defer server.Close()
+		roundTripper := newRateLimitRoundTripper(currentTime, fake, innerRT)
+		currentTime.SetNow(base.Add(2 * time.Hour))
+
+		// Highly compressible, so the wire size stays small while the decoded
+		// size runs past the cap: the shape a decompression bomb takes.
+		compressed := gzipBytes(make([]byte, 9<<20))
+		Expect(len(compressed)).To(BeNumerically("<", 1<<20))
+
+		resp, err := roundTripper.RoundTrip(newBodyRequest(
+			compressed,
+			http.Header{"Content-Encoding": []string{"gzip"}},
+		))
+		Expect(err).NotTo(HaveOccurred())
+		resp.Body.Close()
+
+		// The tee publishes what it will not decode, rather than expanding it.
+		body, _, _, _ := fake.PublishArgsForCall(0)
+		Expect(body).To(Equal(compressed))
+	})
 })
 
 // newBodyRequest builds a project-a ingest request carrying the given body and

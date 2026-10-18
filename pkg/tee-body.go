@@ -17,6 +17,14 @@ import (
 // gzipMagic is the two-byte header every gzip stream starts with.
 var gzipMagic = []byte{0x1f, 0x8b}
 
+// maxTeeBodyBytes caps how far a decompressed body may expand. The tee holds
+// the whole body in memory, and gzip expands by orders of magnitude, so an
+// unbounded read would let one crafted request exhaust the process — the
+// request body itself is already bounded by the sender's compressed size, but
+// its decompressed size is not bounded by anything. A body over the cap is
+// published compressed, exactly like one the tee cannot decode at all.
+const maxTeeBodyBytes = 8 << 20
+
 // teeBody returns the bytes the Kafka tee should publish for one request body.
 //
 // Sentry SDKs gzip their envelope POSTs and set Content-Encoding: gzip. The tee
@@ -47,9 +55,16 @@ func teeBody(header http.Header, body []byte) []byte {
 		return body
 	}
 	defer reader.Close()
-	decoded, err := io.ReadAll(reader)
+	decoded, err := io.ReadAll(io.LimitReader(reader, maxTeeBodyBytes+1))
 	if err != nil {
 		glog.Warningf("gunzip tee body failed, publishing as-is err=%v", err)
+		return body
+	}
+	if len(decoded) > maxTeeBodyBytes {
+		glog.Warningf(
+			"gunzip tee body expands beyond %d bytes, publishing as-is",
+			maxTeeBodyBytes,
+		)
 		return body
 	}
 	return decoded
