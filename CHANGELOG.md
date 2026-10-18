@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.5.0
 
 - feat: cap each project at its own share of the rate-limit window via the new `REQUEST_LIMIT_PER_PROJECT` knob (default `1`, bounded by `REQUEST_LIMIT`), so one project's burst can no longer occupy the whole budget and starve every other project. The total allowance is unchanged — the per-project window is a second veto that only ever removes admissions, and the global window is still checked first. Requests whose project cannot be determined are capped as the ordinary project `unknown` rather than exempted, and the new `sentry_proxy_alerts_limit_tripped_total{scope}` counter records which limit tripped (`global` or `project`).
 
