@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: update Go to 1.27.3 and github.com/bborbe/errors to v1.6.3, github.com/bborbe/http to v1.26.30, github.com/bborbe/kafka to v1.28.4, github.com/bborbe/log to v1.7.4, github.com/bborbe/metrics to v0.6.8, github.com/bborbe/run to v1.11.2, github.com/bborbe/sentry to v1.10.5, github.com/bborbe/service to v1.11.0, github.com/bborbe/time to v1.27.17, github.com/bborbe/validation to v1.5.5
+
 ## v0.5.1
 
 - fix: decompress a gzip-encoded request body before publishing it to the Kafka tee. Sentry SDKs gzip their envelope POSTs and set `Content-Encoding: gzip`, and the record carries the body as a JSON string — so `encoding/json` coerced every invalid-UTF-8 byte of the compressed stream to U+FFFD, making the record undecodable for every consumer (`parse envelope header: invalid character '\x1f' looking for beginning of value`). The tee now gunzips its own copy when the request is gzip-encoded (by header or by magic), so the topic carries the plain envelope; `req.Body` is untouched and the upstream still receives the original compressed bytes. A body that is not gzip, that fails to decompress, or that expands past an 8 MiB cap is published unchanged rather than dropped, expanded, or mangled — the cap matters because the tee holds the body in memory and a small gzip stream can expand by orders of magnitude. The rejection-path log line now prints the decompressed body too — it previously logged the compressed bytes, so the one place that would have shown the corruption was itself unreadable.
