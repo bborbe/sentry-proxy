@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.6.2
 
 - chore: track prompts/in-progress so the dark-factory worktree lane can save prompt metadata
 
