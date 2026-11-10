@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.6.0
 
 - chore: Add the `hack/` cluster build arm — a parameterized Kubernetes Job manifest, the render half of `build-cluster.sh`, the `cluster-alias.sh` helper, the one-time bootstrap script, and the Docker credential template
 - feat: complete the cluster branch of `make build` — `hack/build-cluster.sh` now refuses an existing Job, applies the rendered manifest, waits up to the fixed 3600-second timeout for a terminal state, and on failure prints the Job's events and both containers' log tails inline; an interrupted wait leaves the Job running in the cluster
