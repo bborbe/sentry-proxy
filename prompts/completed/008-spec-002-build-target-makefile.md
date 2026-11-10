@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [002-cluster-build-arm]
+summary: 'Added BUILD_TARGET selector to make build: local keeps the host docker build, cluster delegates to hack/build-cluster.sh, with defaulted-VERSION refusal, wrapped local-only guards, and no-op upload/clean for cluster targets.'
+execution_id: be73abef-25ab-5e76-b083-19d452789889-exec-008-spec-002-build-target-makefile
+dark-factory-version: dev
 created: "2026-11-10T07:45:27Z"
 queued: "2026-11-10T08:18:19Z"
+started: "2026-11-10T08:18:29Z"
+completed: "2026-11-10T08:19:31Z"
 branch: dark-factory/cluster-build-arm
 ---
 
