@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: Add the `hack/` cluster build arm — a parameterized Kubernetes Job manifest, the render half of `build-cluster.sh`, the `cluster-alias.sh` helper, the one-time bootstrap script, and the Docker credential template
+
 ## v0.5.5
 
 - chore: restate the do-not-merge contract in the gate workflow

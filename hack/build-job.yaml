@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: __JOB_NAME__
+  namespace: build
+  labels:
+    app.kubernetes.io/name: sentry-proxy-build
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sentry-proxy-build
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      initContainers:
+        - name: clone
+          image: alpine/git:latest
+          env:
+            - name: REPO_URL
+              value: __REPO_URL__
+            - name: REF
+              value: __REF__
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              echo "cloning ${REPO_URL} at ${REF}"
+              git clone "${REPO_URL}" /workspace/src
+              cd /workspace/src
+              git checkout --detach "${REF}"
+              echo "checked out ${REF}"
+              mkdir -p /workspace/meta
+              git rev-parse --short HEAD > /workspace/meta/commit
+              git describe --tags --always > /workspace/meta/version
+              date -u +%Y-%m-%dT%H:%M:%SZ > /workspace/meta/date
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      containers:
+        - name: build
+          image: moby/buildkit:latest
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_CONFIG
+              value: /workspace/docker-config
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              VERSION=$(cat /workspace/meta/version)
+              COMMIT=$(cat /workspace/meta/commit)
+              DATE=$(cat /workspace/meta/date)
+              buildctl-daemonless.sh build \
+                --frontend dockerfile.v0 \
+                --local context=/workspace/src \
+                --local dockerfile=/workspace/src \
+                --opt filename=__DOCKERFILE__ \
+                --opt platform=linux/amd64 \
+                --opt build-arg:BUILD_GIT_VERSION="${VERSION}" \
+                --opt build-arg:BUILD_GIT_COMMIT="${COMMIT}" \
+                --opt build-arg:BUILD_DATE="${DATE}" \
+                --output type=image,name=__IMAGE__:__TAG__,push=__PUSH__
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: docker-config
+              mountPath: /workspace/docker-config
+              readOnly: true
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: docker-config
+          secret:
+            secretName: buildkit-push
+            items:
+              - key: .dockerconfigjson
+                path: config.json
