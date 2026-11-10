@@ -1,10 +1,15 @@
+BUILD_TARGET ?= local
+BUILD_DOCKERFILE ?= Dockerfile
 DOCKER_REGISTRY ?= docker.io
 IMAGE ?= bborbe/sentry-proxy
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 DIRS += $(shell find */* -maxdepth 0 -name Makefile -exec dirname "{}" \;)
+VERSION_DEFAULTED :=
 ifeq ($(VERSION),)
 	VERSION := $(shell git describe --tags `git rev-list --tags --max-count=1`)
+	VERSION_DEFAULTED := 1
 endif
+JOB_NAME := $(shell printf '%s' 'build-$(VERSION)' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9.-]/-/g' | cut -c1-63 | sed -e 's/[-.]*$$//')
 
 include tools.env
 
@@ -101,8 +106,15 @@ addlicense:
 buca: build upload clean apply
 
 
+ifeq ($(BUILD_TARGET),local)
+BUILD_PREREQS := check-version-tag check-go-mod
+else
+BUILD_PREREQS := check-cluster-version
+endif
+
 .PHONY: build
-build: check-version-tag check-go-mod
+build: $(BUILD_PREREQS)
+ifeq ($(BUILD_TARGET),local)
 	DOCKER_BUILDKIT=1 \
 	docker build \
 	--no-cache \
@@ -115,7 +127,19 @@ build: check-version-tag check-go-mod
 	--build-arg BUILD_DATE=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
 	-t $(DOCKER_REGISTRY)/$(IMAGE):$(VERSION) \
 	-f Dockerfile .
+else
+	./hack/build-cluster.sh \
+		--cluster "$(BUILD_TARGET)" \
+		--repo "https://github.com/bborbe/sentry-proxy.git" \
+		--ref "$(REF)" \
+		--tag "$(VERSION)" \
+		--job "$(JOB_NAME)" \
+		--dockerfile "$(BUILD_DOCKERFILE)" \
+		--image "$(DOCKER_REGISTRY)/$(IMAGE)" \
+		--push "true"
+endif
 
+ifeq ($(BUILD_TARGET),local)
 .PHONY: check-version-tag
 check-version-tag:
 	@if [ -n "$(ALLOW_UNTAGGED_BUILD)" ]; then \
@@ -140,8 +164,17 @@ check-go-mod:
 	else \
 		echo "go.mod not found, skipping go mod vendor."; \
 	fi
+endif
+
+.PHONY: check-cluster-version
+check-cluster-version:
+	@if [ -n "$(VERSION_DEFAULTED)" ] || [ -z "$(VERSION)" ]; then \
+		echo "ERROR: BUILD_TARGET=$(BUILD_TARGET) requires an explicit VERSION=TAG; VERSION was not passed." >&2; \
+		exit 1; \
+	fi
 
 
+ifeq ($(BUILD_TARGET),local)
 .PHONY: upload
 upload:
 	docker push $(DOCKER_REGISTRY)/$(IMAGE):$(VERSION)
@@ -152,6 +185,15 @@ clean:
 	# docker builder prune -a -f
 	docker builder prune --max-used-space 21474836480 -f || true
 	rm -rf vendor
+else
+.PHONY: upload
+upload:
+	@echo "BUILD_TARGET=$(BUILD_TARGET): upload skipped (the cluster Job already pushed the image)"
+
+.PHONY: clean
+clean:
+	@echo "BUILD_TARGET=$(BUILD_TARGET): clean skipped (no local image)"
+endif
 
 .PHONY: apply
 apply:

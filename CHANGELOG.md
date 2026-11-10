@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: Add the `hack/` cluster build arm — a parameterized Kubernetes Job manifest, the render half of `build-cluster.sh`, the `cluster-alias.sh` helper, the one-time bootstrap script, and the Docker credential template
+- feat: complete the cluster branch of `make build` — `hack/build-cluster.sh` now refuses an existing Job, applies the rendered manifest, waits up to the fixed 3600-second timeout for a terminal state, and on failure prints the Job's events and both containers' log tails inline; an interrupted wait leaves the Job running in the cluster
+- feat: add `BUILD_TARGET` to `make build` — `local` (the default) keeps the host `docker build`, while naming a cluster renders and runs a Kubernetes Job that clones `REF`, builds `linux/amd64` with BuildKit, and pushes the image; `make upload` and `make clean` skip their host-side work for a cluster target
+
 ## v0.5.5
 
 - chore: restate the do-not-merge contract in the gate workflow
