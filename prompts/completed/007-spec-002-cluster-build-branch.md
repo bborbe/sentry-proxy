@@ -1,8 +1,13 @@
 ---
-status: approved
+status: completed
 spec: [002-cluster-build-arm]
+summary: Completed the cluster build driver (existing-Job guard, apply with admission handling, 3600s wait, failure log report, interrupt trap) and wired the Makefile's BUILD_TARGET cluster recipe against the script's parser
+execution_id: be73abef-25ab-5e76-b083-19d452789889-exec-007-spec-002-cluster-build-branch
+dark-factory-version: dev
 created: "2026-11-10T07:45:27Z"
 queued: "2026-11-10T08:13:34Z"
+started: "2026-11-10T08:15:18Z"
+completed: "2026-11-10T08:18:28Z"
 branch: dark-factory/cluster-build-arm
 ---
 

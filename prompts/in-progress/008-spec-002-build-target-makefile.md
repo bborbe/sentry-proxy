@@ -1,7 +1,8 @@
 ---
-status: draft
+status: approved
 spec: [002-cluster-build-arm]
 created: "2026-11-10T07:45:27Z"
+queued: "2026-11-10T08:18:19Z"
 branch: dark-factory/cluster-build-arm
 ---
 

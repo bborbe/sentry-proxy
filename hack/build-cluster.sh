@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# hack/build-cluster.sh — render the sentry-proxy build Job from build-job.yaml.
-# This half owns argument parsing, cluster resolution, REF validation and rendering.
-# The apply/wait/report half is added by the next prompt.
+# hack/build-cluster.sh — render, apply, wait for and report the sentry-proxy
+# build Job from build-job.yaml. Argument parsing, cluster resolution, REF
+# validation and rendering live here; the apply/wait/report half drives the Job.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -75,13 +75,71 @@ render_job() {
 		"$SCRIPT_DIR/build-job.yaml"
 }
 
+job_exists() {
+	kubectl -n build get job "$JOB_NAME" >/dev/null 2>&1
+}
+
+check_job_absent() {
+	if job_exists; then
+		echo "ERROR: Job '$JOB_NAME' already exists; delete it first: kubectl -n build delete job $JOB_NAME" >&2
+		exit 1
+	fi
+}
+
+apply_job() {
+	if ! kubectl apply -f "$RENDERED"; then
+		echo "ERROR: Job '$JOB_NAME' was rejected by the cluster" >&2
+		kubectl -n build describe job "$JOB_NAME" >&2 || true
+		exit 1
+	fi
+}
+
+job_conditions() {
+	kubectl -n build get job "$JOB_NAME" -o jsonpath='{.status.conditions[*].type}' 2>/dev/null || true
+}
+
+wait_for_job() {
+	local deadline=$((SECONDS + TIMEOUT))
+	local succeeded=""
+	while true; do
+		succeeded=$(kubectl -n build get job "$JOB_NAME" -o jsonpath='{.status.succeeded}' 2>/dev/null || true)
+		if [ "$succeeded" = "1" ]; then
+			return 0
+		fi
+		if job_conditions | grep -q 'Failed'; then
+			return 1
+		fi
+		if [ "$SECONDS" -ge "$deadline" ]; then
+			echo "ERROR: Job '$JOB_NAME' did not reach a terminal state within ${TIMEOUT} seconds" >&2
+			return 1
+		fi
+		sleep 5
+	done
+}
+
+report_failure() {
+	echo "---- Job events ----" >&2
+	kubectl -n build describe job "$JOB_NAME" >&2 || true
+	echo "---- clone container logs ----" >&2
+	kubectl -n build logs "job/$JOB_NAME" -c clone --tail=200 >&2 || true
+	echo "---- build container logs ----" >&2
+	kubectl -n build logs "job/$JOB_NAME" -c build --tail=200 >&2 || true
+}
+
 run_job() {
-	# Replaced by the next prompt with: check, apply, wait, report.
-	echo "rendered Job manifest for ${JOB_NAME}"
+	check_job_absent
+	apply_job
+	if wait_for_job; then
+		echo "Job '$JOB_NAME' completed; image ${IMAGE}:${TAG} pushed"
+		return 0
+	fi
+	report_failure
+	exit 1
 }
 
 validate_ref
 RENDERED=$(mktemp)
 trap 'rm -f "$RENDERED"' EXIT
+trap 'echo "interrupted; Job ${JOB_NAME} continues in the cluster" >&2; exit 1' INT TERM
 render_job > "$RENDERED"
 run_job
