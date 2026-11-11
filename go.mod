@@ -1,6 +1,6 @@
 module github.com/bborbe/sentry-proxy
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/IBM/sarama v1.61.1
@@ -8,11 +8,11 @@ require (
 	github.com/bborbe/http v1.26.33
 	github.com/bborbe/kafka v1.29.13
 	github.com/bborbe/log v1.7.8
-	github.com/bborbe/metrics v0.6.10
+	github.com/bborbe/metrics v0.6.11
 	github.com/bborbe/run v1.11.11
 	github.com/bborbe/sentry v1.10.7
 	github.com/bborbe/service v1.11.3
-	github.com/bborbe/time v1.27.27
+	github.com/bborbe/time v1.27.28
 	github.com/bborbe/validation v1.5.9
 	github.com/golang/glog v1.2.5
 	github.com/gorilla/mux v1.8.1
@@ -25,10 +25,10 @@ require (
 require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/bborbe/argument/v2 v2.13.10 // indirect
-	github.com/bborbe/collection v1.21.6 // indirect
+	github.com/bborbe/collection v1.21.7 // indirect
 	github.com/bborbe/kv v1.21.29 // indirect
-	github.com/bborbe/math v1.4.19 // indirect
-	github.com/bborbe/parse v1.12.6 // indirect
+	github.com/bborbe/math v1.4.20 // indirect
+	github.com/bborbe/parse v1.12.7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -37,7 +37,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20261110164715-8bb1ee682bd8 // indirect
+	github.com/google/pprof v0.0.0-20261111065629-49901cbc7227 // indirect
 	github.com/hashicorp/go-uuid v1.0.4 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect

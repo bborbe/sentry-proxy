@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: update Go to 1.27.4 and github.com/bborbe/metrics to v0.6.11, github.com/bborbe/time to v1.27.28
+
 ## v0.6.2
 
 - chore: track prompts/in-progress so the dark-factory worktree lane can save prompt metadata
