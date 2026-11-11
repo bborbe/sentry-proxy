@@ -5,9 +5,9 @@ go 1.27.4
 require (
 	github.com/IBM/sarama v1.61.1
 	github.com/bborbe/errors v1.6.6
-	github.com/bborbe/http v1.26.33
-	github.com/bborbe/kafka v1.29.13
-	github.com/bborbe/log v1.7.8
+	github.com/bborbe/http v1.26.34
+	github.com/bborbe/kafka v1.29.14
+	github.com/bborbe/log v1.7.9
 	github.com/bborbe/metrics v0.6.11
 	github.com/bborbe/run v1.11.11
 	github.com/bborbe/sentry v1.10.7
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
-	github.com/bborbe/argument/v2 v2.13.10 // indirect
+	github.com/bborbe/argument/v2 v2.13.11 // indirect
 	github.com/bborbe/collection v1.21.7 // indirect
 	github.com/bborbe/kv v1.21.29 // indirect
 	github.com/bborbe/math v1.4.20 // indirect
@@ -37,7 +37,7 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20261111065629-49901cbc7227 // indirect
+	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26 // indirect
 	github.com/hashicorp/go-uuid v1.0.4 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
@@ -53,7 +53,7 @@ require (
 	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/mod v0.43.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
