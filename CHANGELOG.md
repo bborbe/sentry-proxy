@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.6.3
 
 - chore: update Go to 1.27.4 and github.com/bborbe/metrics to v0.6.11, github.com/bborbe/time to v1.27.28
 
