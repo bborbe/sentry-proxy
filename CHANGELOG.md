@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: update github.com/bborbe/http to v1.26.34, github.com/bborbe/kafka to v1.29.14, github.com/bborbe/log to v1.7.9
+
 ## v0.6.3
 
 - chore: update Go to 1.27.4 and github.com/bborbe/metrics to v0.6.11, github.com/bborbe/time to v1.27.28
