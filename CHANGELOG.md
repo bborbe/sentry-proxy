@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: remove 22 stale vulnerability ignores (withdrawn advisory, module absent from go.mod, or version outside the affected range)
+- chore: install Trivy from a pinned release tarball in CI so the job no longer depends on the retired apt-key helper
+
 ## v0.6.4
 
 - chore: update github.com/bborbe/http to v1.26.34, github.com/bborbe/kafka to v1.29.14, github.com/bborbe/log to v1.7.9
