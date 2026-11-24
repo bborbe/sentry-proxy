@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
-## Unreleased
+## v0.6.5
 
 - chore: remove 22 stale vulnerability ignores (withdrawn advisory, module absent from go.mod, or version outside the affected range)
 - chore: install Trivy from a pinned release tarball in CI so the job no longer depends on the retired apt-key helper
