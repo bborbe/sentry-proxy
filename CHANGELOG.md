@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 Please choose versions by [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+- chore: remove orphaned section comments left in `.trivyignore` by the stale-ignore sweep
+
 ## v0.6.5
 
 - chore: remove 22 stale vulnerability ignores (withdrawn advisory, module absent from go.mod, or version outside the affected range)
